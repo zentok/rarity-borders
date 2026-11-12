@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unpack project zip (if uploaded as zip)
+        run: |
+          shopt -s nullglob
+          for z in *.zip; do
+            echo "Unpacking $z"
+            unzip -o -q "$z"
+          done
+
+      - name: Find project folder
+        id: proj
+        run: |
+          DIR=$(dirname "$(find . -name build.gradle -not -path './.git/*' | head -n 1)")
+          echo "Project folder: $DIR"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.8"
+
+      - name: Build mod
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: buddy
+          path: |
+            ${{ steps.proj.outputs.dir }}/build/libs/*.jar
+            !${{ steps.proj.outputs.dir }}/build/libs/*-sources.jar
